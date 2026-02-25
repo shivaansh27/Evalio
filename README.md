@@ -159,8 +159,8 @@ Evalio is a full-stack AI-powered mock interview platform designed to help job s
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/evalio.git
-   cd evalio
+   git clone https://github.com/shivaansh27/Evalio
+   cd Evalio
    ```
 
 2. **Install dependencies**
@@ -487,7 +487,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Shivansh Sharma** - [shivanshsharma2704@gmail.com](mailto:shivanshsharma2704@gmai.com)
 
-Project Link: [https://github.com/shivaansh27/Evalio---Ai-Interview-Platform](https://github.com/shivaansh27/Evalio---Ai-Interview-Platform)
+Project Link: [https://github.com/shivaansh27/Evalio](https://github.com/shivaansh27/Evalio)
 
 ---
 
