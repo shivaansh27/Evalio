@@ -237,7 +237,7 @@ export default function SignUp() {
                   className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/5 focus:border-primary transition-all outline-none placeholder:text-slate-400
 ${name && errors.name ? "border-red-500" : ""}
 ${name && !errors.name ? "border-green-500" : "border-border-light"}`}
-                  placeholder="Rahul Sharma"
+                  placeholder="Your Full Name"
                   type="text"
                   required
                 />
@@ -248,7 +248,7 @@ ${name && !errors.name ? "border-green-500" : "border-border-light"}`}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Work Email
+                  Your Email
                 </label>
                 <input
                   value={email}
@@ -266,7 +266,7 @@ ${name && !errors.name ? "border-green-500" : "border-border-light"}`}
                   className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary/5 focus:border-primary transition-all outline-none placeholder:text-slate-400
 ${email && errors.email ? "border-red-500" : ""}
 ${email && !errors.email ? "border-green-500" : "border-border-light"}`}
-                  placeholder="rahul@company.com"
+                  placeholder="Your Email"
                   type="email"
                   required
                 />
