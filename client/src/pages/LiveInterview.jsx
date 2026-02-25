@@ -125,6 +125,8 @@ export default function LiveInterview() {
   const recognitionRef = useRef(null);
   const finalizedTranscriptRef = useRef("");
   const countdownIntervalRef = useRef(null);
+  const ttsAbortControllerRef = useRef(null);
+  const currentPlayingQuestionRef = useRef(null);
 
   const currentQuestion = questions[currentIndex];
   const currentQuestionId = currentQuestion?.id;
@@ -191,6 +193,11 @@ export default function LiveInterview() {
       activeAudioRef.current.currentTime = 0;
       activeAudioRef.current = null;
     }
+    if (ttsAbortControllerRef.current) {
+      ttsAbortControllerRef.current.abort();
+      ttsAbortControllerRef.current = null;
+    }
+    currentPlayingQuestionRef.current = null;
   };
 
   const stopLiveTranscript = useCallback(() => {
@@ -233,6 +240,9 @@ export default function LiveInterview() {
   };
 
   const handleExitConfirm = () => {
+    cancelSpeech();
+    stopLiveTranscript();
+    stopCountdown();
     setShowExitModal(false);
     navigate("/dashboard");
   };
@@ -317,23 +327,33 @@ export default function LiveInterview() {
       if (!questionId || !text || text === "Waiting for question...") return;
 
       cancelSpeech();
+      currentPlayingQuestionRef.current = questionId;
       setSubmitError("");
       setEvaluationMessage("Playing AI voice question...");
 
       const cachedUrl = audioCacheRef.current.get(questionId);
       if (cachedUrl) {
+        if (currentPlayingQuestionRef.current !== questionId) return;
         const audio = new Audio(cachedUrl);
         activeAudioRef.current = audio;
         await audio.play();
-        setEvaluationMessage("");
+        if (currentPlayingQuestionRef.current === questionId) {
+          setEvaluationMessage("");
+        }
         return;
       }
+
+      const abortController = new AbortController();
+      ttsAbortControllerRef.current = abortController;
 
       try {
         const response = await apiFetch(`/api/interview/${sessionId}/tts`, {
           method: "POST",
           body: JSON.stringify({ questionId, text }),
+          signal: abortController.signal,
         });
+
+        if (currentPlayingQuestionRef.current !== questionId) return;
 
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
@@ -341,13 +361,19 @@ export default function LiveInterview() {
         }
 
         const blob = await response.blob();
+        if (currentPlayingQuestionRef.current !== questionId) return;
+
         const url = URL.createObjectURL(blob);
         audioCacheRef.current.set(questionId, url);
         const audio = new Audio(url);
         activeAudioRef.current = audio;
         await audio.play();
-        setEvaluationMessage("");
+        if (currentPlayingQuestionRef.current === questionId) {
+          setEvaluationMessage("");
+        }
       } catch (error) {
+        if (error.name === "AbortError") return;
+        if (currentPlayingQuestionRef.current !== questionId) return;
         console.error("TTS playback failed, using browser fallback:", error);
         setEvaluationMessage("Using fallback voice.");
         speakQuestionFallback(text);

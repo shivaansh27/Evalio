@@ -25,6 +25,11 @@ const userSchema = new mongoose.Schema(
     googleId: {
       type: String,
     },
+
+    totalInterviewsCreated: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true },
 );

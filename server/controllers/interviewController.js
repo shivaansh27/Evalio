@@ -501,10 +501,22 @@ export const startInterview = async (req, res) => {
     const bypassInterviewLimit = await isInterviewLimitBypassed(req.user);
 
     if (!bypassInterviewLimit) {
-      const existingInterviewCount = await InterviewSession.countDocuments({
-        user: req.user,
-      });
-      if (existingInterviewCount >= MAX_INTERVIEWS_PER_USER) {
+      const user = await User.findById(req.user).select(
+        "totalInterviewsCreated",
+      );
+      let totalCreated = user?.totalInterviewsCreated;
+
+      if (totalCreated === undefined || totalCreated === null) {
+        const existingCount = await InterviewSession.countDocuments({
+          user: req.user,
+        });
+        await User.findByIdAndUpdate(req.user, {
+          totalInterviewsCreated: existingCount,
+        });
+        totalCreated = existingCount;
+      }
+
+      if (totalCreated >= MAX_INTERVIEWS_PER_USER) {
         if (file?.path) {
           await fs.unlink(file.path).catch(() => null);
         }
@@ -578,6 +590,10 @@ export const startInterview = async (req, res) => {
       parsedResumeText,
       generatedQuestions: aiResult.questions,
       aiMeta: aiResult.aiMeta,
+    });
+
+    await User.findByIdAndUpdate(req.user, {
+      $inc: { totalInterviewsCreated: 1 },
     });
 
     console.info("Interview session created", {
