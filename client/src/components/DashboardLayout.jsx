@@ -108,9 +108,9 @@ export default function DashboardLayout() {
         <div className="md:hidden flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-white font-bold">
-              I
+              <Brain className="text-zinc-900 text-3xl w-8 h-8" />
             </div>
-            <span className="font-bold text-xl">InterviewAI</span>
+            <span className="font-bold text-xl">Evalio</span>
           </div>
           <button className="p-2 rounded-md text-gray-600">
             <Menu className="w-6 h-6" />
