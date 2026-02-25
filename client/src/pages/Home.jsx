@@ -538,10 +538,17 @@ export default function Home() {
                   insights tailored to the Indian job market.
                 </p>
                 <div className="flex gap-4">
-                  <a href="https://www.linkedin.com/in/shivanshsharma27/" target="_blank" className="text-slate-400 hover:text-white">
+                  <a
+                    href="https://www.linkedin.com/in/shivanshsharma27/"
+                    target="_blank"
+                    className="text-slate-400 hover:text-white"
+                  >
                     <Globe className="w-5 h-5" />
                   </a>
-                  <a href="mailto:shivanshsharma2704@gmail.com" className="text-slate-400 hover:text-white">
+                  <a
+                    href="mailto:shivanshsharma2704@gmail.com"
+                    className="text-slate-400 hover:text-white"
+                  >
                     <Mail className="w-5 h-5" />
                   </a>
                 </div>
