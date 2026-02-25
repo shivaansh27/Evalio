@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Environment files - NEVER COMMIT THESE
+.env
+.env.local
+.env.*.local
+*.env
+
+# Firebase credentials - CRITICAL
+**/serviceAccount*.json
+**/serviceAccountKey.json
+**/serviceAccountLey.json
+firebase-admin*.json
+
+# Build outputs
+dist/
+build/
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads (may contain sensitive data)
+uploads/
+
+# Test coverage
+coverage/

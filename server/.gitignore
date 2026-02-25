@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment - NEVER COMMIT
+.env
+.env.local
+.env.*
+
+# Firebase Admin credentials - CRITICAL SECURITY
+serviceAccount*.json
+*serviceAccountKey*.json
+*serviceAccountLey*.json
+config/serviceAccount*.json
+
+# Uploads
+uploads/
+
+# Logs
+*.log
+logs/
+
+# Build
+dist/
