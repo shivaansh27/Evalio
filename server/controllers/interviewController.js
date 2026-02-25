@@ -12,32 +12,32 @@ const LOCK_TIMEOUT_MS = 120000;
 const MAX_DURATION_SEC = 180;
 const DEFAULT_TTS_TIMEOUT_MS = 15000;
 const MAX_INTERVIEWS_PER_USER = 2;
-const INTERVIEW_LIMIT_DISABLED =
-  String(process.env.INTERVIEW_LIMIT_DISABLED || "")
+const QUOTA_DISABLED =
+  String(process.env.EVALIO_QD || "")
     .trim()
     .toLowerCase() === "true";
 
-const INTERVIEW_LIMIT_BYPASS_USER_IDS = new Set(
-  String(process.env.INTERVIEW_LIMIT_BYPASS_USER_IDS || "")
+const PREMIUM_USER_IDS = new Set(
+  String(process.env.EVALIO_PU || "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean),
 );
 
-const INTERVIEW_LIMIT_BYPASS_EMAILS = new Set(
-  String(process.env.INTERVIEW_LIMIT_BYPASS_EMAILS || "")
+const PREMIUM_EMAILS = new Set(
+  String(process.env.EVALIO_PE || "")
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean),
 );
 
-const isInterviewLimitBypassed = async (userId) => {
-  if (INTERVIEW_LIMIT_DISABLED) return true;
+const isPremiumUser = async (userId) => {
+  if (QUOTA_DISABLED) return true;
 
   const normalizedUserId = String(userId || "").trim();
-  if (INTERVIEW_LIMIT_BYPASS_USER_IDS.has(normalizedUserId)) return true;
+  if (PREMIUM_USER_IDS.has(normalizedUserId)) return true;
 
-  if (INTERVIEW_LIMIT_BYPASS_EMAILS.size === 0) return false;
+  if (PREMIUM_EMAILS.size === 0) return false;
 
   const user = await User.findById(userId).select("email").lean();
   const normalizedEmail = String(user?.email || "")
@@ -45,7 +45,7 @@ const isInterviewLimitBypassed = async (userId) => {
     .toLowerCase();
 
   if (!normalizedEmail) return false;
-  return INTERVIEW_LIMIT_BYPASS_EMAILS.has(normalizedEmail);
+  return PREMIUM_EMAILS.has(normalizedEmail);
 };
 
 const toIntScore = (value) => {
@@ -498,15 +498,16 @@ export const startInterview = async (req, res) => {
       });
     }
 
-    const bypassInterviewLimit = await isInterviewLimitBypassed(req.user);
+    const hasPremiumAccess = await isPremiumUser(req.user);
 
-    if (!bypassInterviewLimit) {
-      const user = await User.findById(req.user).select(
-        "totalInterviewsCreated",
-      );
-      let totalCreated = user?.totalInterviewsCreated;
+    if (!hasPremiumAccess) {
+      const user = await User.findById(req.user)
+        .select("totalInterviewsCreated")
+        .lean();
 
-      if (totalCreated === undefined || totalCreated === null) {
+      let totalCreated = user?.totalInterviewsCreated ?? null;
+
+      if (totalCreated === null) {
         const existingCount = await InterviewSession.countDocuments({
           user: req.user,
         });
@@ -642,6 +643,9 @@ export const getInterviewSession = async (req, res) => {
         .json({ message: "Not authorized to access this session." });
     }
 
+    const user = await User.findById(session.user).select("name").lean();
+    const userName = user?.name || "there";
+
     const answeredQuestionIds = (session.answers || []).map(
       (a) => a.questionId,
     );
@@ -654,6 +658,7 @@ export const getInterviewSession = async (req, res) => {
       questions: session.generatedQuestions,
       answeredCount: answeredQuestionIds.length,
       answeredQuestionIds,
+      userName,
     });
   } catch (error) {
     return res
@@ -690,26 +695,32 @@ export const synthesizeInterviewQuestionAudio = async (req, res) => {
         .json({ message: "Not authorized to access this session." });
     }
 
-    const question = (session.generatedQuestions || []).find(
-      (q) => q.id === questionId,
-    );
-    if (!question) {
-      return res
-        .status(400)
-        .json({ message: "Invalid questionId for this session." });
-    }
+    let canonicalText;
 
-    const canonicalText = String(question.text || "").trim();
-    if (!canonicalText) {
-      return res
-        .status(400)
-        .json({ message: "Question text is not available." });
-    }
+    if (questionId === "greeting") {
+      canonicalText = text.trim();
+    } else {
+      const question = (session.generatedQuestions || []).find(
+        (q) => q.id === questionId,
+      );
+      if (!question) {
+        return res
+          .status(400)
+          .json({ message: "Invalid questionId for this session." });
+      }
 
-    if (text.trim() !== canonicalText) {
-      return res
-        .status(400)
-        .json({ message: "Question text does not match session question." });
+      canonicalText = String(question.text || "").trim();
+      if (!canonicalText) {
+        return res
+          .status(400)
+          .json({ message: "Question text is not available." });
+      }
+
+      if (text.trim() !== canonicalText) {
+        return res
+          .status(400)
+          .json({ message: "Question text does not match session question." });
+      }
     }
 
     try {
@@ -1026,13 +1037,25 @@ export const submitInterviewAnswer = async (req, res) => {
 
 export const getDashboardSummary = async (req, res) => {
   try {
-    const bypassInterviewLimit = await isInterviewLimitBypassed(req.user);
+    const hasPremiumAccess = await isPremiumUser(req.user);
     const sessions = await InterviewSession.find({ user: req.user })
       .sort({ createdAt: -1 })
       .lean();
 
-    const interviewsUsed = sessions.length;
-    const interviewsRemaining = bypassInterviewLimit
+    const user = await User.findById(req.user)
+      .select("totalInterviewsCreated")
+      .lean();
+
+    let totalCreated = user?.totalInterviewsCreated ?? null;
+    if (totalCreated === null) {
+      totalCreated = sessions.length;
+      await User.findByIdAndUpdate(req.user, {
+        totalInterviewsCreated: totalCreated,
+      });
+    }
+
+    const interviewsUsed = totalCreated;
+    const interviewsRemaining = hasPremiumAccess
       ? null
       : Math.max(0, MAX_INTERVIEWS_PER_USER - interviewsUsed);
 
@@ -1087,7 +1110,7 @@ export const getDashboardSummary = async (req, res) => {
       interviewsUsed,
       interviewsRemaining,
       maxInterviewsAllowed: MAX_INTERVIEWS_PER_USER,
-      isInterviewLimitBypassed: bypassInterviewLimit,
+      isPremiumUser: hasPremiumAccess,
       recentSessions,
       latestCompletedSessionId: recentSessions[0]?.sessionId || null,
     });

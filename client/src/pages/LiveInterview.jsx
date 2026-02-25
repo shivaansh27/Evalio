@@ -99,6 +99,8 @@ export default function LiveInterview() {
   const [questions, setQuestions] = useState([]);
   const [interviewType, setInterviewType] = useState("");
   const [difficulty, setDifficulty] = useState("");
+  const [userName, setUserName] = useState("");
+  const [greetingPlayed, setGreetingPlayed] = useState(false);
 
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [time, setTime] = useState(0);
@@ -321,6 +323,29 @@ export default function LiveInterview() {
     [voiceEnabled],
   );
 
+  const preloadQuestionAudio = useCallback(
+    async (questionId, text) => {
+      if (!sessionId || !questionId || !text) return;
+      if (audioCacheRef.current.has(questionId)) return;
+
+      try {
+        const response = await apiFetch(`/api/interview/${sessionId}/tts`, {
+          method: "POST",
+          body: JSON.stringify({ questionId, text }),
+        });
+
+        if (!response.ok) return;
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        audioCacheRef.current.set(questionId, url);
+      } catch {
+        // Silent fail for preload
+      }
+    },
+    [sessionId],
+  );
+
   const playQuestionAudio = useCallback(
     async (questionId, text) => {
       if (!voiceEnabled) return;
@@ -382,6 +407,83 @@ export default function LiveInterview() {
     [sessionId, voiceEnabled, speakQuestionFallback],
   );
 
+  const getInterviewTypeName = (type) => {
+    switch (type) {
+      case "technical":
+        return "technical";
+      case "behavioral":
+        return "behavioral";
+      case "case":
+        return "case study";
+      default:
+        return "";
+    }
+  };
+
+  const playGreeting = useCallback(async () => {
+    if (!voiceEnabled || !userName || !interviewType || !sessionId) {
+      setGreetingPlayed(true);
+      return;
+    }
+
+    cancelSpeech();
+    const typeName = getInterviewTypeName(interviewType);
+    const greetingText = `Hi ${userName}, today I am here to take your ${typeName} interview. Let's begin with the first question.`;
+
+    setEvaluationMessage("Starting interview...");
+
+    const abortController = new AbortController();
+    ttsAbortControllerRef.current = abortController;
+
+    try {
+      const response = await apiFetch(`/api/interview/${sessionId}/tts`, {
+        method: "POST",
+        body: JSON.stringify({ questionId: "greeting", text: greetingText }),
+        signal: abortController.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error("TTS request failed");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      activeAudioRef.current = audio;
+
+      audio.onended = () => {
+        setGreetingPlayed(true);
+        setEvaluationMessage("");
+      };
+      audio.onerror = () => {
+        setGreetingPlayed(true);
+        setEvaluationMessage("");
+      };
+
+      await audio.play();
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      console.error("Greeting TTS failed, using fallback:", error);
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        const utterance = new SpeechSynthesisUtterance(greetingText);
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.onend = () => {
+          setGreetingPlayed(true);
+          setEvaluationMessage("");
+        };
+        utterance.onerror = () => {
+          setGreetingPlayed(true);
+          setEvaluationMessage("");
+        };
+        window.speechSynthesis.speak(utterance);
+      } else {
+        setGreetingPlayed(true);
+        setEvaluationMessage("");
+      }
+    }
+  }, [voiceEnabled, userName, interviewType, sessionId]);
+
   const fetchSession = useCallback(async () => {
     if (!sessionId) {
       setLoadError("Missing interview session id.");
@@ -414,6 +516,8 @@ export default function LiveInterview() {
       setQuestions(sessionQuestions);
       setInterviewType(data?.interviewType || "");
       setDifficulty(data?.difficulty || "");
+      setUserName(data?.userName || "");
+      setGreetingPlayed(false);
       setAnsweredIds(answered);
       setCurrentIndex(firstPendingIndex >= 0 ? firstPendingIndex : 0);
       setRecordState(
@@ -437,14 +541,53 @@ export default function LiveInterview() {
   }, [fetchSession]);
 
   useEffect(() => {
+    if (loading || !questions.length || !userName || !interviewType) return;
+
+    const typeName = getInterviewTypeName(interviewType);
+    const greetingText = `Hi ${userName}, today I am here to take your ${typeName} interview. Let's begin with the first question.`;
+    preloadQuestionAudio("greeting", greetingText);
+
+    const firstQ = questions[0];
+    if (firstQ?.id && firstQ?.text) {
+      preloadQuestionAudio(firstQ.id, firstQ.text);
+    }
+    const secondQ = questions[1];
+    if (secondQ?.id && secondQ?.text) {
+      preloadQuestionAudio(secondQ.id, secondQ.text);
+    }
+  }, [loading, questions, userName, interviewType, preloadQuestionAudio]);
+
+  useEffect(() => {
+    if (!questions.length) return;
+
+    const nextQ = questions[currentIndex + 1];
+    if (nextQ?.id && nextQ?.text) {
+      preloadQuestionAudio(nextQ.id, nextQ.text);
+    }
+    const afterNextQ = questions[currentIndex + 2];
+    if (afterNextQ?.id && afterNextQ?.text) {
+      preloadQuestionAudio(afterNextQ.id, afterNextQ.text);
+    }
+  }, [currentIndex, questions, preloadQuestionAudio]);
+
+  useEffect(() => {
     if (loading || loadError) return;
-    playQuestionAudio(currentQuestionId, currentQuestionText);
+    if (!greetingPlayed && currentIndex === 0) {
+      playGreeting();
+      return;
+    }
+    if (greetingPlayed || currentIndex > 0) {
+      playQuestionAudio(currentQuestionId, currentQuestionText);
+    }
   }, [
     currentQuestionId,
     currentQuestionText,
     loadError,
     loading,
     playQuestionAudio,
+    greetingPlayed,
+    currentIndex,
+    playGreeting,
   ]);
 
   useEffect(() => {

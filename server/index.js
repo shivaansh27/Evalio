@@ -20,20 +20,6 @@ const PORT = process.env.PORT || 5000;
 
 app.use(helmet());
 
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { message: "Too many requests, please try again later." },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { message: "Too many login attempts, please try again later." },
-});
-
-app.use(generalLimiter);
-
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
@@ -52,6 +38,20 @@ app.use(
     credentials: true,
   }),
 );
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { message: "Too many requests, please try again later." },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: "Too many login attempts, please try again later." },
+});
+
+app.use(generalLimiter);
 
 app.use(express.json({ limit: "10mb" }));
 

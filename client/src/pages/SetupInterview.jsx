@@ -63,7 +63,7 @@ export default function SetupInterview() {
         setInterviewsUsed(used);
         setMaxInterviewsAllowed(maxAllowed);
         setInterviewsRemaining(Math.max(0, remaining));
-        setIsInterviewLimitBypassed(Boolean(data?.isInterviewLimitBypassed));
+        setIsInterviewLimitBypassed(Boolean(data?.isPremiumUser));
       } catch {}
     };
 
